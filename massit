@@ -2,11 +2,13 @@
 
 import argparse
 import collections
-import decimal
 import fractions
 import itertools
 import os
 import sys
+
+def fraction_to_decimal(fraction):
+	return '{:.2f}'.format(float(fraction))
 
 def print_accounts(accounts):
 	items = sorted(accounts.items())
@@ -16,12 +18,12 @@ def print_accounts(accounts):
 		items.append(('TOTAL', total))
 
 	width_k = max((len(k) for k, v in items))
-	width_v = max((len(str(v)) for k, v in items))
+	width_v = max((len(fraction_to_decimal(v)) for k, v in items))
 
 	for k, v in items:
 		print('| {} | {} |'.format(
 			k.ljust(width_k),
-			str(v).rjust(width_v),
+			fraction_to_decimal(v).rjust(width_v),
 		))
 
 def summarize(d):
@@ -47,7 +49,7 @@ def main(argv=None):
 		'massit.txt'
 	)
 
-	accounts = collections.defaultdict(decimal.Decimal)
+	accounts = collections.defaultdict(fractions.Fraction)
 
 	with open(filename, 'rt') as file:
 		lines = (line.rstrip('\r\n') for line in file)
@@ -56,13 +58,20 @@ def main(argv=None):
 			if not transaction: break
 
 			header = transaction.pop(0)
-			date, payee = header.split('|')
+			fields = header.split('|')
+			if len(fields) == 2:
+				date, payee = fields
+				scale = 1
+			elif len(fields) == 3:
+				date, payee, scale = fields
+
+			scale = fractions.Fraction(scale)
 
 			total = 0
 
 			for line in transaction:
 				account, amount = line.split('|')[:2]
-				amount = decimal.Decimal(amount)
+				amount = fractions.Fraction(amount) * scale
 				total += amount
 
 				if account.startswith('.'):
