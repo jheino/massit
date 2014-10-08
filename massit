@@ -1,0 +1,99 @@
+#!/usr/bin/env python3
+
+import argparse
+import collections
+import decimal
+import fractions
+import itertools
+import os
+import sys
+
+def print_accounts(accounts):
+	items = sorted(accounts.items())
+
+	if len(items) > 1:
+		total = sum((v for k, v in items))
+		items.append(('TOTAL', total))
+
+	width_k = max((len(k) for k, v in items))
+	width_v = max((len(str(v)) for k, v in items))
+
+	for k, v in items:
+		print('| {} | {} |'.format(
+			k.ljust(width_k),
+			str(v).rjust(width_v),
+		))
+
+def summarize(d):
+	pass
+	#if 0:
+	#	parts = account.split(':')
+	#	for i in range(1, len(parts) + 1):
+	#		account = ':'.join(parts[0:i])
+	#		accounts[account] += amount
+
+def main(argv=None):
+	if argv is None:
+		argv = sys.argv[1:]
+
+	parser = argparse.ArgumentParser()
+	parser.add_argument('--by-payee', action='store_true')
+	parser.add_argument('--by-month', action='store_true')
+	parser.add_argument('accounts', metavar='ACCOUNT', nargs='*')
+	args = parser.parse_args(argv)
+
+	filename = os.path.join(
+		os.environ['HOME'],
+		'massit.txt'
+	)
+
+	accounts = collections.defaultdict(decimal.Decimal)
+
+	with open(filename, 'rt') as file:
+		lines = (line.rstrip('\r\n') for line in file)
+		while 1:
+			transaction = list(itertools.takewhile(lambda x: x != '', lines))
+			if not transaction: break
+
+			header = transaction.pop(0)
+			date, payee = header.split('|')
+
+			total = 0
+
+			for line in transaction:
+				account, amount = line.split('|')[:2]
+				amount = decimal.Decimal(amount)
+				total += amount
+
+				if account.startswith('.'):
+					continue
+
+				if args.by_payee:
+					account = ':'.join((payee, account))
+
+				if args.by_month:
+					account = ':'.join((date[:7], account))
+
+				accounts[account] += amount
+
+				if accounts[account] == 0:
+					del accounts[account]
+
+			if total != 0:
+				raise Exception('Total is not 0: ' + str(total))
+
+	if args.accounts:
+		filtered_accounts = {}
+		for filter in args.accounts:
+			for account in accounts:
+				if filter.lower() in account.lower():
+					filtered_accounts[account] = accounts[account]
+		accounts = filtered_accounts
+
+	if accounts:
+		print_accounts(accounts)
+
+	return 0
+
+if __name__ == "__main__":
+	sys.exit(main())
