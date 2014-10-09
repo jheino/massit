@@ -4,14 +4,52 @@ import argparse
 import collections
 import fractions
 import itertools
+import operator
 import os
 import sys
+
+class Transaction(object):
+	def __init__(self, date, payee):
+		self.date = date
+		self.payee = payee
+		self.entries = []
+
+	def add(self, entry):
+		self.entries.append(entry)
+
+	def verify(self):
+		total = sum((entry.amount for entry in self.entries))
+
+		if total != 0:
+			raise Exception('Transaction does not balance to zero!')
+
+	def convert(self):
+		currency_totals = collections.defaultdict(fractions.Fraction)
+		for entry in self.entries:
+			currency_totals[entry.currency] += entry.amount
+
+		if len(currency_totals) == 2:
+			for entry in self.entries:
+				if entry.currency is not None:
+					exchange_rate = currency_totals[entry.currency] / abs(currency_totals[None])
+					entry.amount /= exchange_rate
+		elif len(currency_totals) > 2:
+			raise Exception('More than 2 currencies in transaction. Cannot calculate exchange rate.')
+
+class Entry(object):
+	def __init__(self, account, amount, currency):
+		self.account = account
+		self.amount = amount
+		self.currency = currency
 
 def fraction_to_decimal(fraction):
 	return '{:.2f}'.format(float(fraction))
 
-def print_accounts(accounts):
-	items = sorted(accounts.items())
+def print_accounts(accounts, sort_by_value):
+	if sort_by_value:
+		items = sorted(accounts.items(), key=operator.itemgetter(1))
+	else:
+		items = sorted(accounts.items())
 
 	if len(items) > 1:
 		total = sum((v for k, v in items))
@@ -26,13 +64,32 @@ def print_accounts(accounts):
 			fraction_to_decimal(v).rjust(width_v),
 		))
 
-def summarize(d):
-	pass
-	#if 0:
-	#	parts = account.split(':')
-	#	for i in range(1, len(parts) + 1):
-	#		account = ':'.join(parts[0:i])
-	#		accounts[account] += amount
+def read_transactions(filename):
+	with open(filename, 'rt') as file:
+		lines = (line.rstrip('\r\n') for line in file)
+		while 1:
+			transaction_lines = list(itertools.takewhile(lambda x: x != '', lines))
+			if not transaction_lines: break
+
+			header = transaction_lines.pop(0)
+			date, payee = header.split('|')
+
+			transaction = Transaction(date, payee)
+
+			for line in transaction_lines:
+				account, amount = line.split('|')[:2]
+				try:
+					amount, currency = amount.split(' ')
+				except ValueError:
+					currency = None
+				amount = fractions.Fraction(amount)
+				entry = Entry(account, amount, currency)
+				transaction.add(entry)
+
+			transaction.convert()
+			transaction.verify()
+
+			yield transaction
 
 def main(argv=None):
 	if argv is None:
@@ -41,6 +98,7 @@ def main(argv=None):
 	parser = argparse.ArgumentParser()
 	parser.add_argument('--by-payee', action='store_true')
 	parser.add_argument('--by-month', action='store_true')
+	parser.add_argument('--sort-by-value', action='store_true')
 	parser.add_argument('accounts', metavar='ACCOUNT', nargs='*')
 	args = parser.parse_args(argv)
 
@@ -51,45 +109,18 @@ def main(argv=None):
 
 	accounts = collections.defaultdict(fractions.Fraction)
 
-	with open(filename, 'rt') as file:
-		lines = (line.rstrip('\r\n') for line in file)
-		while 1:
-			transaction = list(itertools.takewhile(lambda x: x != '', lines))
-			if not transaction: break
-
-			header = transaction.pop(0)
-			fields = header.split('|')
-			if len(fields) == 2:
-				date, payee = fields
-				scale = 1
-			elif len(fields) == 3:
-				date, payee, scale = fields
-
-			scale = fractions.Fraction(scale)
-
-			total = 0
-
-			for line in transaction:
-				account, amount = line.split('|')[:2]
-				amount = fractions.Fraction(amount) * scale
-				total += amount
-
-				if account.startswith('.'):
-					continue
-
-				if args.by_payee:
-					account = ':'.join((payee, account))
-
-				if args.by_month:
-					account = ':'.join((date[:7], account))
-
-				accounts[account] += amount
-
-				if accounts[account] == 0:
-					del accounts[account]
-
-			if total != 0:
-				raise Exception('Total is not 0: ' + str(total))
+	for transaction in read_transactions(filename):
+		for entry in transaction.entries:
+			account = entry.account
+			if account.startswith('.'):
+				continue
+			if args.by_payee:
+				account = ':'.join((transaction.payee, account))
+			if args.by_month:
+				account = ':'.join((transaction.date[:7], account))
+			accounts[account] += entry.amount
+			if accounts[account] == 0:
+				del accounts[account]
 
 	if args.accounts:
 		filtered_accounts = {}
@@ -100,7 +131,7 @@ def main(argv=None):
 		accounts = filtered_accounts
 
 	if accounts:
-		print_accounts(accounts)
+		print_accounts(accounts, args.sort_by_value)
 
 	return 0
 
