@@ -6,6 +6,7 @@ import fractions
 import itertools
 import operator
 import os
+import re
 import sys
 
 class Transaction(object):
@@ -126,7 +127,7 @@ def main(argv=None):
 		filtered_accounts = {}
 		for filter in args.accounts:
 			for account in accounts:
-				if filter.lower() in account.lower():
+				if re.search(filter, account, re.IGNORECASE):
 					filtered_accounts[account] = accounts[account]
 		accounts = filtered_accounts
 
