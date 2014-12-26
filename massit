@@ -22,7 +22,7 @@ class Transaction(object):
 		total = sum((entry.amount for entry in self.entries))
 
 		if total != 0:
-			raise Exception('Transaction does not balance to zero!')
+			raise Exception('Transaction does not balance to zero: ' + str(float(total)))
 
 	def convert(self):
 		currency_totals = collections.defaultdict(fractions.Fraction)
