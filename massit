@@ -2,7 +2,10 @@
 
 import argparse
 import collections
-import fractions
+try:
+	import quicktions as fractions
+except ImportError:
+	import fractions
 import itertools
 import operator
 import os
