@@ -113,7 +113,13 @@ def main(argv=None):
 
 	accounts = collections.defaultdict(fractions.Fraction)
 
+	last_date = None
+
 	for transaction in read_transactions(filename):
+		if last_date and transaction.date < last_date:
+			raise Exception('Next transaction older than the last:', transaction.date)
+		last_date = transaction.date
+
 		for entry in transaction.entries:
 			account = entry.account
 			if account.startswith('.'):
