@@ -102,6 +102,7 @@ def main(argv=None):
 	parser = argparse.ArgumentParser()
 	parser.add_argument('--by-payee', action='store_true')
 	parser.add_argument('--by-month', action='store_true')
+	parser.add_argument('--by-year', action='store_true')
 	parser.add_argument('--sort-by-value', action='store_true')
 	parser.add_argument('accounts', metavar='ACCOUNT', nargs='*')
 	args = parser.parse_args(argv)
@@ -128,6 +129,8 @@ def main(argv=None):
 				account = ':'.join((transaction.payee, account))
 			if args.by_month:
 				account = ':'.join((transaction.date[:7], account))
+			if args.by_year:
+				account = ':'.join((transaction.date[:4], account))
 			accounts[account] += entry.amount
 			if accounts[account] == 0:
 				del accounts[account]
