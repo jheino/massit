@@ -35,7 +35,7 @@ class Transaction(object):
 		if len(currency_totals) == 2:
 			for entry in self.entries:
 				if entry.currency is not None:
-					exchange_rate = currency_totals[entry.currency] / abs(currency_totals[None])
+					exchange_rate = abs(currency_totals[entry.currency]) / abs(currency_totals[None])
 					entry.amount /= exchange_rate
 		elif len(currency_totals) > 2:
 			raise Exception('More than 2 currencies in transaction. Cannot calculate exchange rate.')
