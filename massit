@@ -14,9 +14,10 @@ import sys
 
 
 class Transaction(object):
-    def __init__(self, date, payee):
+    def __init__(self, date, payee, labels):
         self.date = date
         self.payee = payee
+        self.labels = labels
         self.entries = []
 
     def add(self, entry):
@@ -85,10 +86,17 @@ def read_transactions(filename):
             if not transaction_lines:
                 break
 
-            header = transaction_lines.pop(0)
-            date, payee = header.split('|')
+            labels = set()
 
-            transaction = Transaction(date, payee)
+            while 1:
+               line = transaction_lines.pop(0)
+               if line.startswith('#'):
+                 labels.add(line)
+               else:
+                 date, payee = line.split('|')
+                 break
+
+            transaction = Transaction(date, payee, labels)
 
             for line in transaction_lines:
                 account, amount = line.split('|')[:2]
@@ -114,6 +122,7 @@ def main(argv=None):
     parser.add_argument('--by-payee', action='store_true')
     parser.add_argument('--by-month', action='store_true')
     parser.add_argument('--by-year', action='store_true')
+    parser.add_argument('-f', '--filter', action='append')
     parser.add_argument('--sort-by-value', action='store_true')
     parser.add_argument('accounts', metavar='ACCOUNT', nargs='*')
     args = parser.parse_args(argv)
@@ -128,6 +137,8 @@ def main(argv=None):
     last_date = None
 
     for transaction in read_transactions(filename):
+        if args.filter and not set(args.filter) & transaction.labels:
+          continue
         if last_date and transaction.date < last_date:
             raise Exception(
                 'Next transaction older than the last:', transaction.date)
